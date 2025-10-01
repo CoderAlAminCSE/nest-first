@@ -1,8 +1,15 @@
+-- CreateEnum
+CREATE TYPE "public"."Role" AS ENUM ('ADMIN', 'USER', 'MANAGER');
+
 -- CreateTable
 CREATE TABLE "public"."User" (
     "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "name" TEXT,
+    "phone" TEXT,
+    "address" TEXT,
+    "role" "public"."Role" NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );

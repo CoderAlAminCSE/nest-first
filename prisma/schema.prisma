@@ -16,8 +16,12 @@ datasource db {
 
 model User {
   id    Int     @id @default(autoincrement())
+  name  String
   email String  @unique
-  name  String?
+  phone    String?
+  address    String?
+  role     Role
+  isActive Boolean @default(true)
   posts Post[]
 }
 
@@ -28,4 +32,10 @@ model Post {
   published Boolean? @default(false)
   author    User?    @relation(fields: [authorId], references: [id])
   authorId  Int?
+}
+
+enum Role {
+  ADMIN
+  USER
+  MANAGER
 }
