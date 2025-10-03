@@ -8,6 +8,25 @@ import { JwtService } from '@nestjs/jwt';
 export class AuthService {
   constructor(private prisma: PrismaService, private jwtService: JwtService) {}
 
+    // Generate Access + Refresh Tokens
+    private async generateTokens(userId: number, email: string, role: string) {
+        const payload = { sub: userId, email, role };
+
+        // Access Token
+        const accessToken = this.jwtService.sign(payload, {
+            secret: process.env.JWT_SECRET,
+            expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '1h',
+        });
+
+        // Refresh Token
+        const refreshToken = this.jwtService.sign(payload, {
+            secret: process.env.JWT_REFRESH_SECRET,
+            expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+        });
+
+        return { accessToken, refreshToken };
+    }
+
     // Register a new user
     async register(dto: CreateUserDto) {
         // Check if email already exists
@@ -51,30 +70,64 @@ export class AuthService {
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) { throw new UnauthorizedException('Invalid email or password'); }
 
-        if (!isPasswordValid) {
-        throw new UnauthorizedException('Invalid email or password');
-        }
+        // Generate tokens
+        const tokens = await this.generateTokens(user.id, user.email, user.role);
 
-        // Create payload for JWT
-        const payload = {
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-        };
-
-        const token = this.jwtService.sign(payload);
+        // Store hashed refresh token in DB for security
+        const hashedRt = await bcrypt.hash(tokens.refreshToken, 10);
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: { hashedRt },
+        });
 
         // Return user and token
         return {
-        message: 'Login successful',
-        user: {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-        },
-        access_token: token,
+            message: 'Login successful',
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+            },
+            ...tokens,
         };
     }
+
+    // Refresh access token using refresh token
+    async refresh(refreshToken: string) {
+    try {
+        // Verify refresh token with refresh secret
+        const payload = await this.jwtService.verifyAsync(refreshToken, {
+            secret: process.env.JWT_REFRESH_SECRET,
+        });
+
+        // Find user
+        const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+        if (!user || !user.hashedRt)
+            throw new UnauthorizedException('Invalid refresh token');
+
+        // Compare provided token with stored hashed one
+        const isRtValid = await bcrypt.compare(refreshToken, user.hashedRt);
+        if (!isRtValid) throw new UnauthorizedException('Invalid refresh token');
+
+        // Generate new tokens
+        const tokens = await this.generateTokens(user.id, user.email, user.role);
+
+        // Update refresh token in DB
+        const hashedRt = await bcrypt.hash(tokens.refreshToken, 10);
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: { hashedRt },
+        });
+        
+        return {
+            message: 'Token refreshed successfully',
+            ...tokens,
+        };
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+  }
 }
