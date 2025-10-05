@@ -4,6 +4,8 @@ import {
   Body,
   UseGuards,
   Req,
+  Get,
+  Query
 } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -19,5 +21,13 @@ export class PostsController {
   async create(@Req() req: any, @Body() dto: CreatePostDto) {
     const userId = req.user?.userId;
     return this.postsService.create(userId, dto);
+  }
+
+  @Get()
+  async findAll(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+  ) {
+    return this.postsService.findAll(+page, +limit);
   }
 }
