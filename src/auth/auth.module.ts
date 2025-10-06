@@ -5,6 +5,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { PaginationModule } from '../common/pagination/pagination.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       signOptions: { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '1h' },
     }),
     PrismaModule,
+    PaginationModule
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

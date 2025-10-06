@@ -3,10 +3,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import { CreateUserDto } from './dto/create-user.dto';
 import { JwtService } from '@nestjs/jwt';
+import { PaginationService } from 'src/common/pagination/pagination.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService, private jwtService: JwtService) {}
+  constructor(private prisma: PrismaService, private jwtService: JwtService, private readonly paginationService: PaginationService) {}
 
     // Generate Access + Refresh Tokens
     private async generateTokens(userId: number, email: string, role: string) {
@@ -129,5 +130,39 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
-  }
+    }
+
+
+    // Get all users
+    async getAllUsers(page: number = 1, pageSize: number = 10) {
+        // Use pagination service
+        const { skip, take, totalPages, currentPage } =
+        this.paginationService.paginate(page, pageSize);
+
+        // Get data + total count together
+        const [users, totalCount] = await Promise.all([
+        this.prisma.user.findMany({
+            skip,
+            take,
+            orderBy: { id: 'desc' }
+        }),
+        this.prisma.user.count(),
+        ]);
+
+        // Recalculate totalPages based on actual count
+        const totalPagesFinal = this.paginationService.calculateTotalPages(
+        totalCount,
+        pageSize,
+        );
+
+        return {
+        data: users,
+        meta: {
+            totalCount,
+            currentPage,
+            pageSize,
+            totalPages: totalPagesFinal,
+        },
+        };
+    }
 }
